@@ -1,9 +1,10 @@
-mod archive_helper;
-
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use clap::Parser;
+
+use archive_extractor::extract;
+use archive_extractor::extract_to;
 
 // ---------------------------------------------------------------------------
 // CLI 参数定义
@@ -27,6 +28,10 @@ struct Cli {
     /// 可选的输出根目录；不指定时解压到压缩文件同级目录下
     #[arg(short = 'o', long)]
     output: Option<PathBuf>,
+
+    /// 解压密码（适用于加密的压缩包）
+    #[arg(short = 'p', long)]
+    password: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -52,8 +57,9 @@ fn main() {
 
     // 2. 遍历处理每个路径
     let output_dir = args.output.as_deref();
+    let password = args.password.as_deref();
     for path in &paths {
-        process_path(path, args.depth, output_dir);
+        process_path(path, args.depth, output_dir, password);
     }
 }
 
@@ -94,7 +100,7 @@ fn resolve_inputs(args: &Cli) -> Result<Vec<PathBuf>, String> {
 // ---------------------------------------------------------------------------
 
 /// 处理单个路径：文件直接解压，目录递归扫描
-fn process_path(path: &Path, depth: u32, output_dir: Option<&Path>) {
+fn process_path(path: &Path, depth: u32, output_dir: Option<&Path>, password: Option<&str>) {
     if !path.exists() {
         eprintln!("路径不存在，跳过: {}", path.display());
         return;
@@ -102,7 +108,7 @@ fn process_path(path: &Path, depth: u32, output_dir: Option<&Path>) {
 
     if path.is_file() {
         // 直接解压该文件
-        extract_single(path, output_dir);
+        extract_single(path, output_dir, password);
     } else if path.is_dir() {
         // 扫描目录，收集压缩文件
         let mut archives = Vec::new();
@@ -119,19 +125,19 @@ fn process_path(path: &Path, depth: u32, output_dir: Option<&Path>) {
             archives.len()
         );
         for archive in &archives {
-            extract_single(archive, output_dir);
+            extract_single(archive, output_dir, password);
         }
     }
 }
 
-/// 解压单个文件（可指定输出基目录）
-fn extract_single(path: &Path, output_dir: Option<&Path>) {
+/// 解压单个文件（可指定输出基目录和密码）
+fn extract_single(path: &Path, output_dir: Option<&Path>, password: Option<&str>) {
     match output_dir {
-        None => archive_helper::extract(path),
+        None => extract(path, password),
         Some(base) => {
             let stem = path.file_stem().unwrap_or_default();
             let dest = base.join(stem);
-            archive_helper::extract_to(path, &dest);
+            extract_to(path, &dest, password);
         }
     }
 }

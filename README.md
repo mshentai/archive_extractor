@@ -10,6 +10,7 @@
 - 📋 **路径列表文件**：支持注释行（`#` 开头），每行一个路径
 - 📦 **自定义输出目录**：将所有解压内容集中到指定目录
 - 🛡️ 安全的 ZIP 解压（自动跳过路径遍历条目）
+- 🔑 **密码解压**：支持加密的 ZIP / 7z / RAR 压缩包
 
 ## 支持格式
 
@@ -110,8 +111,9 @@ Options:
   -l, --list             将 PATH 视为路径列表文件（每行一个路径）
   -d, --depth <DEPTH>    目录扫描深度 [default: 1]，只对目录生效
   -o, --output <OUTPUT>  可选输出根目录
-  -h, --help             Print help
-  -V, --version          Print version
+  -p, --password <PASSWORD>  解压密码（压缩包加密时使用）
+  -h, --help                  Print help
+  -V, --version               Print version
 ```
 
 ## 示例合集
@@ -134,18 +136,40 @@ archive_extractor --list archive_list.txt --output ./extracted/
 
 # 6. 目录扫描 + 输出目录
 archive_extractor --depth 2 ./mods/ --output ./extracted/
+
+# 7. 解压加密的压缩包
+archive_extractor protected.rar --password mypassword
+
+# 8. 扫描目录时统一使用密码
+archive_extractor --depth 3 ./downloads/ --password mypassword
+
+# 9. 列表文件批量解压 + 密码
+archive_extractor --list archive_list.txt --password mypassword --output ./extracted/
 ```
 
 ## 项目结构
 
 ```
 archive_extractor/
-├── Cargo.toml            # 项目元信息与依赖声明
-├── Cargo.lock            # 依赖版本锁定（精确复现构建）
-├── .gitignore            # Git 忽略规则
-└── src/
-    ├── main.rs           # CLI 入口：参数解析、输入调度、目录扫描
-    └── archive_helper.rs # 解压核心：格式识别（文件签名）、ZIP/7z/RAR 解压实现
+├── Cargo.toml                     # 项目元信息与依赖声明
+├── Cargo.lock                     # 依赖版本锁定（精确复现构建）
+├── .gitignore                     # Git 忽略规则
+├── src/
+│   ├── main.rs                    # CLI 入口：参数解析、输入调度、目录扫描
+│   ├── lib.rs                     # 库入口，公开 API 导出（extract / extract_to）
+│   ├── archive_helper.rs          # 高层解压接口：文件读取 + 委托分发
+│   ├── path_utils.rs              # 路径工具（default_dest、ensure_parent_dir）
+│   └── formats/
+│       ├── mod.rs                 # 格式分发器（infer 检测 + 路由）
+│       ├── zip.rs                 # ZIP 解压实现
+│       ├── sevenz.rs              # 7z 解压实现
+│       └── rar.rs                 # RAR 解压实现
+└── tests/
+    ├── common/
+    │   └── mod.rs                 # 共享测试辅助函数
+    ├── path_utils_tests.rs        # 路径工具单元测试
+    ├── format_detection_tests.rs  # 格式检测集成测试
+    └── zip_tests.rs               # ZIP 解压集成测试（含密码功能）
 ```
 
 ## 依赖
