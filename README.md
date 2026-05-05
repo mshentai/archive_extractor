@@ -25,7 +25,17 @@
 > **环境要求**：Rust 工具链 **1.85.0** 或更高版本。可通过 `rustup update` 升级到最新稳定版。
 > 运行 `rustc --version` 可查看当前版本。
 
-### 从源码编译（推荐）
+### 方式一：全局安装（推荐）
+
+安装后可在任意目录下直接使用 `ae` 命令：
+
+```bash
+git clone <repo-url>
+cd archive_extractor
+cargo install --path .
+```
+
+### 方式二：本地编译
 
 ```bash
 git clone <repo-url>
@@ -33,7 +43,7 @@ cd archive_extractor
 cargo build --release
 ```
 
-编译产物位于 `target/release/archive_extractor.exe`，建议将其加入 `PATH`，之后便可全局使用 `archive_extractor` 命令。
+编译产物位于 `target/release/ae.exe`，建议将其所在目录加入 `PATH`。
 
 ## 快速运行（开发 / 调试）
 
@@ -52,7 +62,7 @@ cargo run -- <参数>
 ### 1️⃣ 解压单个文件
 
 ```bash
-archive_extractor game.rar
+ae game.rar
 ```
 
 解压到 `game/` 目录（与压缩包同级）。
@@ -61,10 +71,10 @@ archive_extractor game.rar
 
 ```bash
 # 仅扫描当前目录（默认 depth=1）
-archive_extractor ./downloads/
+ae ./downloads/
 
 # 递归扫描子目录，最大深度 3
-archive_extractor -d 3 ./downloads/
+ae -d 3 ./downloads/
 ```
 
 工具会自动跳过非压缩文件。
@@ -72,7 +82,7 @@ archive_extractor -d 3 ./downloads/
 ### 3️⃣ 从列表文件批量解压
 
 ```bash
-archive_extractor -l archive_list.txt
+ae -l archive_list.txt
 ```
 
 列表文件格式示例（`archive_list.txt`）：
@@ -91,10 +101,10 @@ savegame.zip
 
 ```bash
 # 单个文件指定输出目录
-archive_extractor game.zip -o ./extracted/
+ae game.zip -o ./extracted/
 
 # 列表文件 + 输出目录
-archive_extractor -l archive_list.txt -o ./extracted/
+ae -l archive_list.txt -o ./extracted/
 ```
 
 使用 `-o` 时，解压结构为 `<输出目录>/<压缩文件名不带后缀>/`。
@@ -102,7 +112,7 @@ archive_extractor -l archive_list.txt -o ./extracted/
 ## CLI 参数
 
 ```
-Usage: archive_extractor [OPTIONS] <PATH>
+Usage: ae [OPTIONS] <PATH>
 
 Arguments:
   <PATH>  压缩文件路径 / 目录路径 / 列表文件路径（当使用 --list 时）
@@ -120,31 +130,31 @@ Options:
 
 ```bash
 # 1. 解压单个文件
-archive_extractor game.rar
+ae game.rar
 
 # 2. 扫描目录（默认 depth=1）
-archive_extractor ./downloads/
+ae ./downloads/
 
 # 3. 递归扫描子目录
-archive_extractor --depth 3 ./downloads/
+ae --depth 3 ./downloads/
 
 # 4. 列表文件中混合文件+目录
-archive_extractor --list archive_list.txt
+ae --list archive_list.txt
 
 # 5. 列表文件 + 输出目录
-archive_extractor --list archive_list.txt --output ./extracted/
+ae --list archive_list.txt --output ./extracted/
 
 # 6. 目录扫描 + 输出目录
-archive_extractor --depth 2 ./mods/ --output ./extracted/
+ae --depth 2 ./mods/ --output ./extracted/
 
 # 7. 解压加密的压缩包
-archive_extractor protected.rar --password mypassword
+ae protected.rar --password mypassword
 
 # 8. 扫描目录时统一使用密码
-archive_extractor --depth 3 ./downloads/ --password mypassword
+ae --depth 3 ./downloads/ --password mypassword
 
 # 9. 列表文件批量解压 + 密码
-archive_extractor --list archive_list.txt --password mypassword --output ./extracted/
+ae --list archive_list.txt --password mypassword --output ./extracted/
 ```
 
 ## 项目结构
