@@ -1,14 +1,19 @@
 use std::fs;
-use std::io::Cursor;
+use std::io::{Read, Seek};
 use std::path::Path;
 
 use crate::path_utils::ensure_parent_dir;
 
-/// 解压 ZIP 文件
-pub(crate) fn extract_zip(path: &Path, data: &[u8], dest: &Path, password: Option<&str>) {
+/// 解压 ZIP 文件（流式读取，无需全量加载到内存）
+pub(crate) fn extract_zip<R: Read + Seek>(
+    path: &Path,
+    reader: R,
+    dest: &Path,
+    password: Option<&str>,
+) {
     println!("正在解压 ZIP: {} -> {}", path.display(), dest.display());
 
-    let mut archive = match zip::ZipArchive::new(Cursor::new(data)) {
+    let mut archive = match zip::ZipArchive::new(reader) {
         Ok(a) => a,
         Err(e) => {
             eprintln!("无法打开 ZIP 文件 {}: {}", path.display(), e);

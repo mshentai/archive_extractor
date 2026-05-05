@@ -18,15 +18,6 @@ pub fn extract_to(path: &Path, dest: &Path, password: Option<&str>) {
         return;
     }
 
-    // 1. 读取文件到缓冲区
-    let data = match fs::read(path) {
-        Ok(d) => d,
-        Err(e) => {
-            eprintln!("无法读取文件 {}: {}", path.display(), e);
-            return;
-        }
-    };
-
-    // 2. 用 formats::dispatch 检测类型并分发
-    formats::dispatch_format(path, &data, dest, password);
+    // 由 formats::dispatch_format 内部自行管理文件读取和类型检测
+    formats::dispatch_format(path, dest, password);
 }
