@@ -109,6 +109,23 @@ ae -l archive_list.txt -o ./extracted/
 
 使用 `-o` 时，解压结构为 `<输出目录>/<压缩文件名不带后缀>/`。
 
+### 5️⃣ 平铺模式（不建子目录）
+
+```bash
+# 跳过 <文件名>/ 子目录，直接解压到指定目录
+ae game.zip --flat -o ./extracted/
+
+# 解压到压缩包所在目录（不建子目录）
+ae game.zip --flat
+
+# 列表文件 + 平铺模式
+ae -l archive_list.txt --flat -o ./out/
+```
+
+默认行为会在输出路径中增加一层 `<压缩文件名不带后缀>/` 子目录。使用 `--flat`（或 `-f`）可跳过这层目录，将压缩包内容直接展开到目标根目录。
+
+> **注意**：`--flat` 模式下多个压缩包解压到同目录时，同名文件会互相覆盖。ZIP 格式会打印冲突警告，7z/RAR 格式由外部库管理（静默覆盖）。
+
 ## CLI 参数
 
 ```
@@ -121,6 +138,7 @@ Options:
   -l, --list             将 PATH 视为路径列表文件（每行一个路径）
   -d, --depth <DEPTH>    目录扫描深度 [default: 1]，只对目录生效
   -o, --output <OUTPUT>  可选输出根目录
+  -f, --flat             平铺模式：跳过 <文件名>/ 子目录，直接解压到输出根目录
   -p, --password <PASSWORD>  解压密码（压缩包加密时使用）
   -h, --help                  Print help
   -V, --version               Print version
@@ -155,6 +173,12 @@ ae --depth 3 ./downloads/ --password mypassword
 
 # 9. 列表文件批量解压 + 密码
 ae --list archive_list.txt --password mypassword --output ./extracted/
+
+# 10. 平铺模式：直接解压到输出目录（不建子目录）
+ae game.zip --flat -o ./extracted/
+
+# 11. 平铺模式：解压到压缩包所在目录
+ae game.zip --flat
 ```
 
 ## 项目结构

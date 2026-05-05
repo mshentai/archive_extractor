@@ -229,3 +229,77 @@ fn test_is_password_required_error() {
     let other_err = zip::result::ZipError::FileNotFound;
     assert!(!is_password_required_error(&other_err));
 }
+
+// ── Flat 模式（等价 --flat 行为）测试 ────────────────────
+
+#[test]
+fn test_extract_zip_flat_mode_no_subdir() {
+    // --flat 的等价行为：直接用 extract_to 解压到目标目录
+    // 验证不会多出一层 <file_stem>/ 子目录
+    let dir = temp_dir("zip_flat_no_subdir");
+    let zip_data = create_test_zip(&[("hello.txt", b"Hello, Flat!")], None);
+    let zip_path = write_temp_file(&dir, "test.zip", &zip_data);
+
+    // flat 模式：直接解压到目标目录（不拼接 file_stem）
+    let dest = dir.join("flat_out");
+    extract_to(&zip_path, &dest, None);
+
+    // 文件应直接在 dest 下，没有 test/ 这层子目录
+    assert!(dest.join("hello.txt").exists());
+    assert_eq!(read_file_to_string(&dest.join("hello.txt")), "Hello, Flat!");
+
+    // 验证 dest 下没有 test/ 子目录（即不存在 test/hello.txt）
+    assert!(!dest.join("test").join("hello.txt").exists());
+}
+
+#[test]
+fn test_extract_zip_flat_with_subdirs() {
+    // flat 模式下，压缩包内子目录结构应保留
+    let dir = temp_dir("zip_flat_subdirs");
+    let zip_data = create_test_zip(
+        &[
+            ("dir1/file1.txt", b"file1"),
+            ("dir2/file2.txt", b"file2"),
+            ("root.txt", b"root"),
+        ],
+        None,
+    );
+    let zip_path = write_temp_file(&dir, "archive.zip", &zip_data);
+
+    // flat 模式：直接解压到目标目录
+    let dest = dir.join("flat_out");
+    extract_to(&zip_path, &dest, None);
+
+    // 验证目录结构是 dest/dir1/file1.txt，不是 dest/archive/dir1/file1.txt
+    assert_eq!(read_file_to_string(&dest.join("root.txt")), "root");
+    assert_eq!(read_file_to_string(&dest.join("dir1/file1.txt")), "file1");
+    assert_eq!(read_file_to_string(&dest.join("dir2/file2.txt")), "file2");
+
+    // 验证没有多余的 file_stem 子目录
+    assert!(!dest.join("archive").exists());
+}
+
+#[test]
+fn test_extract_zip_flat_conflict_overwrite() {
+    // flat 模式下，两个压缩包解压到同目录：后覆盖先
+    let dir = temp_dir("zip_flat_conflict");
+
+    // 第一个压缩包：version1.txt
+    let zip1 = create_test_zip(&[("data.txt", b"version1")], None);
+    let zip1_path = write_temp_file(&dir, "a.zip", &zip1);
+
+    // 第二个压缩包：也有 data.txt，内容不同
+    let zip2 = create_test_zip(&[("data.txt", b"version2")], None);
+    let zip2_path = write_temp_file(&dir, "b.zip", &zip2);
+
+    let dest = dir.join("out");
+    // 先解压 a.zip
+    extract_to(&zip1_path, &dest, None);
+    assert_eq!(read_file_to_string(&dest.join("data.txt")), "version1");
+
+    // 再解压 b.zip（覆盖 a.zip 的 data.txt）
+    extract_to(&zip2_path, &dest, None);
+
+    // 验证被覆盖为 version2
+    assert_eq!(read_file_to_string(&dest.join("data.txt")), "version2");
+}

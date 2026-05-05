@@ -84,10 +84,14 @@ pub fn is_password_required_error(e: &zip::result::ZipError) -> bool {
 }
 
 /// 将 ZIP 条目写入磁盘
+/// 如果目标文件已存在，打印警告
 pub(crate) fn write_entry<R: std::io::Read>(
     reader: &mut R,
     out_path: &Path,
 ) -> std::io::Result<()> {
+    if out_path.exists() {
+        eprintln!("  警告: 文件已存在，将被覆盖: {}", out_path.display());
+    }
     let mut out_file = fs::File::create(out_path)?;
     std::io::copy(reader, &mut out_file)?;
     Ok(())
