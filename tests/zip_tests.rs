@@ -15,7 +15,7 @@ fn test_extract_zip_basic() {
     let zip_path = write_temp_file(&dir, "test.zip", &zip_data);
 
     let dest = dir.join("out");
-    extract_to(&zip_path, &dest, None);
+    let _ = extract_to(&zip_path, &dest, None);
 
     let content = read_file_to_string(&dest.join("hello.txt"));
     assert_eq!(content, "Hello, World!");
@@ -35,7 +35,7 @@ fn test_extract_zip_with_subdirs() {
     let zip_path = write_temp_file(&dir, "test.zip", &zip_data);
 
     let dest = dir.join("out");
-    extract_to(&zip_path, &dest, None);
+    let _ = extract_to(&zip_path, &dest, None);
 
     assert_eq!(read_file_to_string(&dest.join("root.txt")), "root");
     assert_eq!(read_file_to_string(&dest.join("dir1/file1.txt")), "file1");
@@ -56,7 +56,7 @@ fn test_extract_zip_path_traversal_safety() {
     let zip_path = write_temp_file(&dir, "test.zip", &zip_data);
 
     let dest = dir.join("out");
-    extract_to(&zip_path, &dest, None);
+    let _ = extract_to(&zip_path, &dest, None);
 
     // safe.txt 应该被解压
     assert!(dest.join("safe.txt").exists(), "safe.txt 应被解压");
@@ -72,7 +72,7 @@ fn test_extract_zip_empty() {
     let zip_path = write_temp_file(&dir, "empty.zip", &zip_data);
 
     let dest = dir.join("out");
-    extract_to(&zip_path, &dest, None);
+    let _ = extract_to(&zip_path, &dest, None);
 
     assert!(dest.exists());
     assert!(dest.read_dir().unwrap().next().is_none());
@@ -83,7 +83,7 @@ fn test_extract_zip_nonexistent_file() {
     let dir = temp_dir("zip_nonexist");
     let fake_path = dir.join("no_such_file.zip");
     // 不应 panic
-    extract(&fake_path, None);
+    let _ = extract(&fake_path, None);
 }
 
 #[test]
@@ -91,7 +91,7 @@ fn test_extract_zip_not_a_zip() {
     let dir = temp_dir("zip_not_zip");
     let fake_zip = write_temp_file(&dir, "not_a_zip.bin", b"not a zip file content");
     // 不应 panic
-    extract(&fake_zip, None);
+    let _ = extract(&fake_zip, None);
 }
 
 #[test]
@@ -101,7 +101,7 @@ fn test_extract_to_custom_dest() {
     let zip_path = write_temp_file(&dir, "test.zip", &zip_data);
 
     let custom_dest = dir.join("custom_output");
-    extract_to(&zip_path, &custom_dest, None);
+    let _ = extract_to(&zip_path, &custom_dest, None);
 
     assert!(custom_dest.join("hello.txt").exists());
     assert_eq!(
@@ -119,7 +119,7 @@ fn test_extract_zip_with_password_correct() {
     let zip_path = write_temp_file(&dir, "protected.zip", &zip_data);
 
     let dest = dir.join("out");
-    extract_to(&zip_path, &dest, Some("mypassword"));
+    let _ = extract_to(&zip_path, &dest, Some("mypassword"));
 
     let content = read_file_to_string(&dest.join("secret.txt"));
     assert_eq!(content, "Top Secret Data");
@@ -132,13 +132,15 @@ fn test_extract_zip_without_password_encrypted() {
     let zip_path = write_temp_file(&dir, "protected.zip", &zip_data);
 
     let dest = dir.join("out");
-    // 不提供密码，应跳过加密条目而非崩溃
-    extract_to(&zip_path, &dest, None);
+    // 不提供密码，应返回 PasswordRequired
+    let result = extract_to(&zip_path, &dest, None);
 
-    // 目标目录应存在但为空（条目因加密被跳过）
-    assert!(dest.exists());
-    // secret.txt 不应被解压（因为没有密码）
-    assert!(!dest.join("secret.txt").exists());
+    // 应返回 PasswordRequired 错误
+    assert!(result.is_err());
+    assert!(matches!(
+        result.unwrap_err(),
+        archive_extractor::ExtractError::PasswordRequired
+    ));
 }
 
 #[test]
@@ -149,7 +151,7 @@ fn test_extract_zip_wrong_password() {
 
     let dest = dir.join("out");
     // 提供错误密码
-    extract_to(&zip_path, &dest, Some("wrong_pwd"));
+    let _ = extract_to(&zip_path, &dest, Some("wrong_pwd"));
 
     assert!(dest.exists());
     // 密码错误，解压应失败（或条目被跳过）
@@ -180,12 +182,15 @@ fn test_extract_zip_mixed_encrypted_and_plain() {
     let zip_data = zip.finish().unwrap().into_inner();
     let zip_path = write_temp_file(&dir, "mixed.zip", &zip_data);
 
-    // 不提供密码 → 未加密条目应正常解压，加密条目应被跳过
+    // 不提供密码 → 应返回 PasswordRequired
     let dest = dir.join("out");
-    extract_to(&zip_path, &dest, None);
+    let result = extract_to(&zip_path, &dest, None);
 
-    assert_eq!(read_file_to_string(&dest.join("public.txt")), "Public Data");
-    assert!(!dest.join("private.txt").exists());
+    assert!(result.is_err());
+    assert!(matches!(
+        result.unwrap_err(),
+        archive_extractor::ExtractError::PasswordRequired
+    ));
 }
 
 #[test]
@@ -212,7 +217,7 @@ fn test_extract_zip_mixed_with_password() {
 
     // 提供密码 → 两者都解压
     let dest = dir.join("out");
-    extract_to(&zip_path, &dest, Some("secret"));
+    let _ = extract_to(&zip_path, &dest, Some("secret"));
 
     assert_eq!(read_file_to_string(&dest.join("public.txt")), "Public Data");
     assert_eq!(
@@ -242,7 +247,7 @@ fn test_extract_zip_flat_mode_no_subdir() {
 
     // flat 模式：直接解压到目标目录（不拼接 file_stem）
     let dest = dir.join("flat_out");
-    extract_to(&zip_path, &dest, None);
+    let _ = extract_to(&zip_path, &dest, None);
 
     // 文件应直接在 dest 下，没有 test/ 这层子目录
     assert!(dest.join("hello.txt").exists());
@@ -268,7 +273,7 @@ fn test_extract_zip_flat_with_subdirs() {
 
     // flat 模式：直接解压到目标目录
     let dest = dir.join("flat_out");
-    extract_to(&zip_path, &dest, None);
+    let _ = extract_to(&zip_path, &dest, None);
 
     // 验证目录结构是 dest/dir1/file1.txt，不是 dest/archive/dir1/file1.txt
     assert_eq!(read_file_to_string(&dest.join("root.txt")), "root");
@@ -294,11 +299,11 @@ fn test_extract_zip_flat_conflict_overwrite() {
 
     let dest = dir.join("out");
     // 先解压 a.zip
-    extract_to(&zip1_path, &dest, None);
+    let _ = extract_to(&zip1_path, &dest, None);
     assert_eq!(read_file_to_string(&dest.join("data.txt")), "version1");
 
     // 再解压 b.zip（覆盖 a.zip 的 data.txt）
-    extract_to(&zip2_path, &dest, None);
+    let _ = extract_to(&zip2_path, &dest, None);
 
     // 验证被覆盖为 version2
     assert_eq!(read_file_to_string(&dest.join("data.txt")), "version2");

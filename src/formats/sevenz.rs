@@ -1,7 +1,13 @@
 use std::path::Path;
 
+use crate::ExtractError;
+
 /// 解压 7z 文件
-pub(crate) fn extract_7z(path: &Path, dest: &Path, password: Option<&str>) {
+pub(crate) fn extract_7z(
+    path: &Path,
+    dest: &Path,
+    password: Option<&str>,
+) -> Result<(), ExtractError> {
     println!("正在解压 7z: {} -> {}", path.display(), dest.display());
 
     let result = match password {
@@ -13,14 +19,36 @@ pub(crate) fn extract_7z(path: &Path, dest: &Path, password: Option<&str>) {
     };
 
     match result {
-        Ok(_) => println!("7z 解压完成: {}", dest.display()),
+        Ok(_) => {
+            println!("7z 解压完成: {}", dest.display());
+            Ok(())
+        }
         Err(e) => {
-            let hint = if password.is_none() {
-                "（可能已加密，请使用 -p/--password 提供密码）"
+            let err_msg = e.to_string();
+            // 判断是否需要密码：sevenz-rust 在加密且无密码时会返回特定错误信息
+            if password.is_none() && is_7z_password_error(&err_msg) {
+                Err(ExtractError::PasswordRequired)
             } else {
-                "（密码错误？）"
-            };
-            eprintln!("解压 7z 文件 {} 失败: {} {}", path.display(), e, hint);
+                Err(ExtractError::ExtractFailed(format!(
+                    "解压 7z 文件失败: {}",
+                    err_msg
+                )))
+            }
         }
     }
+}
+
+/// 判断 7z 错误信息是否与密码相关
+fn is_7z_password_error(msg: &str) -> bool {
+    let keywords = [
+        "encrypted",
+        "password",
+        "Wrong password",
+        "Error as unknown",
+        "Decoder error",
+        "k_wrongPassword",
+        "crypto",
+    ];
+    let lower = msg.to_lowercase();
+    keywords.iter().any(|k| lower.contains(&k.to_lowercase()))
 }

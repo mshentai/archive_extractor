@@ -1,3 +1,6 @@
+[workspace]
+members = ["ae-gui"]
+
 [package]
 name = "archive_extractor"
 version = "0.1.0"

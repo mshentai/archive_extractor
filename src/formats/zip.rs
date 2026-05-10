@@ -2,6 +2,7 @@ use std::fs;
 use std::io::{Read, Seek};
 use std::path::Path;
 
+use crate::ExtractError;
 use crate::path_utils::ensure_parent_dir;
 
 /// 解压 ZIP 文件（流式读取，无需全量加载到内存）
@@ -10,16 +11,21 @@ pub(crate) fn extract_zip<R: Read + Seek>(
     reader: R,
     dest: &Path,
     password: Option<&str>,
-) {
+) -> Result<(), ExtractError> {
     println!("正在解压 ZIP: {} -> {}", path.display(), dest.display());
 
-    let mut archive = match zip::ZipArchive::new(reader) {
-        Ok(a) => a,
-        Err(e) => {
-            eprintln!("无法打开 ZIP 文件 {}: {}", path.display(), e);
-            return;
+    let mut archive = zip::ZipArchive::new(reader)
+        .map_err(|e| ExtractError::ExtractFailed(format!("无法打开 ZIP 文件: {}", e)))?;
+
+    // 预检查：无密码时尝试读取第一个条目，如果因加密失败则返回 PasswordRequired
+    if password.is_none() && archive.len() > 0 {
+        match archive.by_index(0) {
+            Err(ref e) if is_password_required_error(e) => {
+                return Err(ExtractError::PasswordRequired);
+            }
+            _ => {} // 无加密或其它错误，继续处理
         }
-    };
+    }
 
     for i in 0..archive.len() {
         // 尝试读取条目（带密码或不带密码）
@@ -29,21 +35,16 @@ pub(crate) fn extract_zip<R: Read + Seek>(
             archive.by_index(i)
         };
 
-        // 如果无密码但条目加密，给用户明确提示
+        // 如果无密码但条目加密，返回密码所需错误
         if let Err(ref e) = entry_result {
             if is_password_required_error(e) {
-                eprintln!("  条目 #{} 已加密，请使用 -p/--password 提供密码", i);
-                continue;
+                return Err(ExtractError::PasswordRequired);
             }
         }
 
-        let mut entry = match entry_result {
-            Ok(e) => e,
-            Err(e) => {
-                eprintln!("  读取 ZIP 条目 #{} 失败: {}", i, e);
-                continue;
-            }
-        };
+        let mut entry = entry_result.map_err(|e| {
+            ExtractError::ExtractFailed(format!("读取 ZIP 条目 #{} 失败: {}", i, e))
+        })?;
 
         // 安全性：跳过包含路径遍历的条目
         let entry_path = entry.name().replace('\\', "/");
@@ -72,6 +73,7 @@ pub(crate) fn extract_zip<R: Read + Seek>(
     }
 
     println!("ZIP 解压完成: {}", dest.display());
+    Ok(())
 }
 
 /// 检查是否为「需要密码」的 ZIP 错误

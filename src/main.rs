@@ -63,8 +63,16 @@ fn main() {
     let output_dir = args.output.as_deref();
     let flat = args.flat;
     let password = args.password.as_deref();
+    let mut has_error = false;
     for path in &paths {
-        process_path(path, args.depth, output_dir, flat, password);
+        if let Err(e) = process_path(path, args.depth, output_dir, flat, password) {
+            eprintln!("处理失败 [{}]: {}", path.display(), e);
+            has_error = true;
+        }
+    }
+
+    if has_error {
+        std::process::exit(1);
     }
 }
 
@@ -111,15 +119,15 @@ fn process_path(
     output_dir: Option<&Path>,
     flat: bool,
     password: Option<&str>,
-) {
+) -> Result<(), archive_extractor::ExtractError> {
     if !path.exists() {
         eprintln!("路径不存在，跳过: {}", path.display());
-        return;
+        return Ok(());
     }
 
     if path.is_file() {
         // 直接解压该文件
-        extract_single(path, output_dir, flat, password);
+        extract_single(path, output_dir, flat, password)
     } else if path.is_dir() {
         // 扫描目录，收集压缩文件
         let mut archives = Vec::new();
@@ -127,7 +135,7 @@ fn process_path(
 
         if archives.is_empty() {
             println!("目录 '{}' 中没有找到压缩文件。", path.display());
-            return;
+            return Ok(());
         }
 
         println!(
@@ -136,8 +144,11 @@ fn process_path(
             archives.len()
         );
         for archive in &archives {
-            extract_single(archive, output_dir, flat, password);
+            extract_single(archive, output_dir, flat, password)?;
         }
+        Ok(())
+    } else {
+        Ok(())
     }
 }
 
@@ -145,25 +156,28 @@ fn process_path(
 ///
 /// `flat=false`（默认）：输出到 `<root>/<file_stem>/`
 /// `flat=true`：输出到 `<root>/`（跳过 file_stem 子目录）
-fn extract_single(path: &Path, output_dir: Option<&Path>, flat: bool, password: Option<&str>) {
+fn extract_single(
+    path: &Path,
+    output_dir: Option<&Path>,
+    flat: bool,
+    password: Option<&str>,
+) -> Result<(), archive_extractor::ExtractError> {
     match (output_dir, flat) {
         // 无 -o + 无 --flat（默认）：解压到压缩包同级目录下的同名子目录
         (None, false) => extract(path, password),
         // 无 -o + --flat：直接解压到压缩包所在目录
         (None, true) => {
             let dest = path.parent().unwrap_or(Path::new("."));
-            extract_to(path, dest, password);
+            extract_to(path, dest, password)
         }
         // 有 -o + 无 --flat（默认）：解压到 <OUTPUT>/<file_stem>/
         (Some(base), false) => {
             let stem = path.file_stem().unwrap_or_default();
             let dest = base.join(stem);
-            extract_to(path, &dest, password);
+            extract_to(path, &dest, password)
         }
         // 有 -o + --flat：直接解压到 <OUTPUT>/
-        (Some(base), true) => {
-            extract_to(path, base, password);
-        }
+        (Some(base), true) => extract_to(path, base, password),
     }
 }
 

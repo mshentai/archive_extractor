@@ -1,8 +1,10 @@
 # Archive Extractor 🗜️
 
-一个轻量的 Rust 解压工具，支持 **ZIP / 7z / RAR** 三种常见压缩格式的批量解压。
+一个轻量的 Rust 解压工具，支持 **ZIP / 7z / RAR** 三种常见压缩格式的批量解压，提供 **CLI** 和 **GUI** 双界面。
 
 ## 功能特性
+
+### CLI 工具 (`ae`)
 
 - 🎯 **三种输入方式**：单文件、单目录、路径列表文件（可混合文件与目录）
 - 🔍 自动识别压缩格式（基于文件签名，而非扩展名）— 无扩展名文件也能正确识别
@@ -11,6 +13,13 @@
 - 📦 **自定义输出目录**：将所有解压内容集中到指定目录
 - 🛡️ 安全的 ZIP 解压（自动跳过路径遍历条目）
 - 🔑 **密码解压**：支持加密的 ZIP / 7z / RAR 压缩包
+
+### GUI 工具 (`ae-gui`)
+
+- 🖥️ 图形界面操作，无需记忆命令参数
+- 🔐 **智能密码弹窗**：检测到加密文件自动弹出密码输入框
+- 📂 **右键菜单集成**：一键注册「使用 AE 解压」到文件和目录右键菜单
+- 🤫 **静默解压模式**：右键点击直接解压，成功无感知，加密才弹窗
 
 ## 支持格式
 
@@ -25,29 +34,86 @@
 > **环境要求**：Rust 工具链 **1.85.0** 或更高版本。可通过 `rustup update` 升级到最新稳定版。
 > 运行 `rustc --version` 可查看当前版本。
 
-### 方式一：全局安装（推荐）
-
-安装后可在任意目录下直接使用 `ae` 命令：
+### 本地编译
 
 ```bash
 git clone <repo-url>
 cd archive_extractor
-cargo install --path .
+cargo build --release --workspace
 ```
 
-### 方式二：本地编译
+编译产物位于：
+
+| 文件 | 说明 |
+|------|------|
+| `target/release/ae.exe` | CLI 工具 |
+| `target/release/ae-gui.exe` | GUI 图形界面 |
+
+建议将 `target/release` 目录加入 `PATH`。
+
+### 单独编译
 
 ```bash
-git clone <repo-url>
-cd archive_extractor
-cargo build --release
+cargo build --release -p archive_extractor    # 仅编译 CLI
+cargo build --release -p ae-gui               # 仅编译 GUI
+cargo build --release --workspace             # 编译全部（CLI + GUI）
 ```
 
-编译产物位于 `target/release/ae.exe`，建议将其所在目录加入 `PATH`。
+---
 
-## 快速运行（开发 / 调试）
+## GUI 使用指南
 
-如果你只是想快速测试，不需要安装到系统：
+### 交互模式
+
+双击 `ae-gui.exe` 启动图形界面：
+
+```
+┌─────────────────────────────────┐
+│  📦 AE - Archive Extractor      │
+├─────────────────────────────────┤
+│  [📂 选择文件] [📁 选择目录]       │
+│  ┌─────────────────────────┐    │
+│  │  文件路径显示区域          │    │
+│  └─────────────────────────┘    │
+│  [🚀 解压]  状态: 就绪          │
+│  ─────────────────────────────  │
+│  日志信息区域                     │
+│  ─────────────────────────────  │
+│  ⚙ 右键菜单管理                  │
+│  [📝 注册右键菜单] [🗑 取消注册]  │
+└─────────────────────────────────┘
+```
+
+1. 点击 **「选择文件」** 或 **「选择目录」** 选择要解压的内容
+2. 点击 **「解压」** 开始解压
+3. 如果文件加密，会自动弹出密码输入框
+
+### 右键菜单集成
+
+1. 打开 `ae-gui.exe`
+2. 点击 **「注册右键菜单」** 按钮
+3. 之后在任意 **压缩文件** 或 **目录** 上右键，选择 **「使用 AE 解压」**
+
+> 右键菜单调用的是 `ae-gui.exe` 的静默模式：解压成功时无界面弹出；只有遇到加密文件时才会弹窗询问密码。
+
+### 密码弹窗
+
+```
+┌── 🔑 输入密码 ──────────────────┐
+│  此文件已加密，请输入解压密码：    │
+│  文件: secret.zip                 │
+│  ┌──────────────────────────┐    │
+│  │  请输入密码               │    │
+│  └──────────────────────────┘    │
+│  [确定]  [取消]                   │
+└─────────────────────────────────┘
+```
+
+---
+
+## CLI 使用指南
+
+### 快速运行（开发 / 调试）
 
 ```bash
 git clone <repo-url>
@@ -57,9 +123,9 @@ cargo run -- <参数>
 
 > **注意**：`cargo run` 为 debug 模式，性能较低，且必须在项目目录下执行。
 
-## 使用方法
+### 使用方法
 
-### 1️⃣ 解压单个文件
+#### 1️⃣ 解压单个文件
 
 ```bash
 ae game.rar
@@ -69,7 +135,7 @@ ae game.rar
 
 > **注意**：对于无扩展名的文件（如 `特典`），默认解压目录名可能与源文件冲突，工具会自动添加 `_` 后缀避免冲突（例如 `特典` → `特典_`），若仍冲突则依次使用 `特典_2`、`特典_3`……
 
-### 2️⃣ 扫描目录
+#### 2️⃣ 扫描目录
 
 ```bash
 # 仅扫描当前目录（默认 depth=1）
@@ -81,7 +147,7 @@ ae -d 3 ./downloads/
 
 工具会自动跳过非压缩文件。
 
-### 3️⃣ 从列表文件批量解压
+#### 3️⃣ 从列表文件批量解压
 
 ```bash
 ae -l archive_list.txt
@@ -99,7 +165,7 @@ savegame.zip
 
 每行一个路径，可以是压缩文件或目录，工具自动识别处理。
 
-### 4️⃣ 指定输出目录
+#### 4️⃣ 指定输出目录
 
 ```bash
 # 单个文件指定输出目录
@@ -111,7 +177,7 @@ ae -l archive_list.txt -o ./extracted/
 
 使用 `-o` 时，解压结构为 `<输出目录>/<压缩文件名不带后缀>/`。
 
-### 5️⃣ 平铺模式（不建子目录）
+#### 5️⃣ 平铺模式（不建子目录）
 
 ```bash
 # 跳过 <文件名>/ 子目录，直接解压到指定目录
@@ -128,7 +194,7 @@ ae -l archive_list.txt --flat -o ./out/
 
 > **注意**：`--flat` 模式下多个压缩包解压到同目录时，同名文件会互相覆盖。ZIP 格式会打印冲突警告，7z/RAR 格式由外部库管理（静默覆盖）。
 
-## CLI 参数
+### CLI 参数
 
 ```
 Usage: ae [OPTIONS] <PATH>
@@ -146,7 +212,7 @@ Options:
   -V, --version               Print version
 ```
 
-## 示例合集
+### 示例合集
 
 ```bash
 # 1. 解压单个文件
@@ -183,37 +249,54 @@ ae game.zip --flat -o ./extracted/
 ae game.zip --flat
 ```
 
+---
+
 ## 项目结构
 
 ```
-archive_extractor/
-├── Cargo.toml                     # 项目元信息与依赖声明
-├── Cargo.lock                     # 依赖版本锁定（精确复现构建）
-├── .gitignore                     # Git 忽略规则
-├── src/
-│   ├── main.rs                    # CLI 入口：参数解析、输入调度、目录扫描
-│   ├── lib.rs                     # 库入口，公开 API 导出（extract / extract_to）
-│   ├── archive_helper.rs          # 高层解压接口：文件读取 + 委托分发
-│   ├── path_utils.rs              # 路径工具（default_dest、ensure_parent_dir）
+archive_extractor/                     (workspace root)
+├── Cargo.toml                         # workspace + library + CLI 配置
+├── Cargo.lock                         # 依赖版本锁定（精确复现构建）
+├── .gitignore                         # Git 忽略规则
+├── README.md                          # 本文件
+├── src/                               # library + CLI 源码
+│   ├── main.rs                        # CLI 入口：参数解析、输入调度、目录扫描
+│   ├── lib.rs                         # 库入口，公开 API 导出（extract / extract_to）
+│   │                                   #   + ExtractError 错误类型
+│   ├── archive_helper.rs              # 高层解压接口：文件读取 + 委托分发
+│   ├── path_utils.rs                  # 路径工具（default_dest、ensure_parent_dir）
 │   └── formats/
-│       ├── mod.rs                 # 格式分发器（infer 检测 + 路由）
-│       ├── zip.rs                 # ZIP 解压实现
-│       ├── sevenz.rs              # 7z 解压实现
-│       └── rar.rs                 # RAR 解压实现
-└── tests/
-    ├── common/
-    │   └── mod.rs                 # 共享测试辅助函数
-    ├── path_utils_tests.rs        # 路径工具单元测试
-    ├── format_detection_tests.rs  # 格式检测集成测试
-    └── zip_tests.rs               # ZIP 解压集成测试（含密码功能）
+│       ├── mod.rs                     # 格式分发器（infer 检测 + 路由）
+│       ├── zip.rs                     # ZIP 解压实现
+│       ├── sevenz.rs                  # 7z 解压实现
+│       └── rar.rs                     # RAR 解压实现
+├── ae-gui/                            # GUI 源码（workspace 成员）
+│   ├── Cargo.toml                     # GUI 依赖配置
+│   └── src/
+│       ├── main.rs                    # 入口：交互模式 / 静默模式双启动
+│       ├── app.rs                     # egui 主界面：文件选择、解压、密码弹窗、右键管理
+│       ├── extract.rs                 # 后台解压线程管理（mpsc 通信）
+│       └── context_menu.rs            # 右键菜单注册表操作（winreg）
+├── tests/                             # 集成测试
+│   ├── common/
+│   │   └── mod.rs                     # 共享测试辅助函数
+│   ├── path_utils_tests.rs            # 路径工具单元测试
+│   ├── format_detection_tests.rs      # 格式检测集成测试
+│   └── zip_tests.rs                   # ZIP 解压集成测试（含密码功能）
+└── plans/
+    └── ae-gui-implementation-plan.md  # GUI 实施计划文档
 ```
 
 ## 依赖
 
-| Crate         | 用途         |
-| ------------- | ------------ |
-| `clap`        | CLI 参数解析 |
-| `infer`       | 文件格式检测 |
-| `zip`         | ZIP 解压     |
-| `sevenz-rust` | 7z 解压      |
-| `unrar`       | RAR 解压     |
+| Crate         | 用途                    |
+| ------------- | ----------------------- |
+| `clap`        | CLI 参数解析             |
+| `infer`       | 文件格式检测              |
+| `zip`         | ZIP 解压                |
+| `sevenz-rust` | 7z 解压                 |
+| `unrar`       | RAR 解压                |
+| `eframe`      | GUI 窗口框架（egui）      |
+| `egui`        | 即时模式 GUI 库           |
+| `rfd`         | 原生文件/目录选择对话框     |
+| `winreg`      | Windows 注册表操作（右键菜单） |
