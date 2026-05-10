@@ -138,7 +138,7 @@ ae game.rar
 #### 2️⃣ 扫描目录
 
 ```bash
-# 仅扫描当前目录（默认 depth=1）
+# 递归扫描所有子目录（默认 depth=0，不限制深度）
 ae ./downloads/
 
 # 递归扫描子目录，最大深度 3
@@ -204,7 +204,7 @@ Arguments:
 
 Options:
   -l, --list             将 PATH 视为路径列表文件（每行一个路径）
-  -d, --depth <DEPTH>    目录扫描深度 [default: 1]，只对目录生效
+  -d, --depth <DEPTH>    目录扫描深度 [default: 0 (不限制)]，0 表示递归所有子目录，只对目录生效
   -o, --output <OUTPUT>  可选输出根目录
   -f, --flat             平铺模式：跳过 <文件名>/ 子目录，直接解压到输出根目录
   -p, --password <PASSWORD>  解压密码（压缩包加密时使用）
@@ -218,7 +218,7 @@ Options:
 # 1. 解压单个文件
 ae game.rar
 
-# 2. 扫描目录（默认 depth=1）
+# 2. 递归扫描所有子目录（默认 depth=0，不限制深度）
 ae ./downloads/
 
 # 3. 递归扫描子目录

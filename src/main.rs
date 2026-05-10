@@ -21,8 +21,8 @@ struct Cli {
     #[arg(short = 'l', long)]
     list: bool,
 
-    /// 目录扫描深度（仅扫描目录本身时填 1，递归子目录叠加）
-    #[arg(short = 'd', long, default_value = "1")]
+    /// 目录扫描深度（0 表示不限制深度，递归所有子目录）
+    #[arg(short = 'd', long, default_value = "0")]
     depth: u32,
 
     /// 可选的输出根目录；不指定时解压到压缩文件同级目录下
@@ -208,7 +208,7 @@ fn scan_directory(dir: &Path, max_depth: u32, cur_depth: u32, results: &mut Vec<
 
         if entry_path.is_file() {
             results.push(entry_path);
-        } else if entry_path.is_dir() && cur_depth < max_depth {
+        } else if entry_path.is_dir() && (max_depth == 0 || cur_depth < max_depth) {
             // 递归扫描子目录
             scan_directory(&entry_path, max_depth, cur_depth + 1, results);
         }
