@@ -75,14 +75,14 @@ impl AeGuiApp {
     }
 
     /// 启动解压
-    fn start_extract(&mut self, path: PathBuf, password: Option<String>) {
+    fn start_extract(&mut self, path: PathBuf) {
         self.is_extracting = true;
         self.status_text = format!("正在解压: {} ...", path.display());
         self.log_messages.clear();
         self.password_error = None;
 
         if let Some(tx) = &self.cmd_tx {
-            let _ = tx.send(WorkerCommand::Extract { path, password });
+            let _ = tx.send(WorkerCommand::Extract { path });
         }
     }
 
@@ -103,20 +103,31 @@ impl AeGuiApp {
                                 self.should_exit = true;
                             }
                         }
-                        Err(ExtractError::PasswordRequired) => {
-                            self.status_text = "🔒 文件已加密，请输入密码".to_string();
-                            // 保存路径，准备密码弹窗
-                            self.pending_path = self.file_path.clone();
-                            self.show_password_dialog = true;
-                            self.password_input.clear();
-                        }
                         Err(ExtractError::ExtractFailed(msg)) => {
                             self.status_text = format!("❌ 解压失败: {}", msg);
                         }
+                        // PasswordRequired / WrongPassword 现在通过独立消息处理，不再走 Finished
+                        _ => {}
                     }
                 }
                 WorkerMessage::Progress { current, total } => {
                     self.status_text = format!("解压进度: {}/{}", current, total);
+                }
+                WorkerMessage::PasswordRequired {
+                    file_path,
+                    current,
+                    total,
+                    is_wrong_password,
+                } => {
+                    self.status_text = format!("🔒 [{}/{}] 需要密码", current, total);
+                    self.pending_path = Some(file_path);
+                    self.show_password_dialog = true;
+                    self.password_input.clear();
+                    if is_wrong_password {
+                        self.password_error = Some("密码错误，请重新输入".to_string());
+                    } else {
+                        self.password_error = None;
+                    }
                 }
             }
         }
@@ -129,10 +140,11 @@ impl AeGuiApp {
             self.password_error = Some("密码不能为空".to_string());
             return;
         }
-        if let Some(path) = self.pending_path.take() {
-            self.show_password_dialog = false;
-            self.password_error = None;
-            self.start_extract(path, Some(pwd));
+        self.show_password_dialog = false;
+        self.password_error = None;
+        // 将密码发送给工作线程，无需重新启动解压
+        if let Some(tx) = &self.cmd_tx {
+            let _ = tx.send(WorkerCommand::ProvidePassword(pwd));
         }
     }
 
@@ -167,7 +179,7 @@ impl eframe::App for AeGuiApp {
         if self.should_start_extract {
             self.should_start_extract = false;
             if let Some(path) = self.silent_file.clone() {
-                self.start_extract(path, None);
+                self.start_extract(path);
             }
         }
 
@@ -217,7 +229,7 @@ impl eframe::App for AeGuiApp {
                 };
                 if response.clicked() {
                     if let Some(path) = self.file_path.clone() {
-                        self.start_extract(path, None);
+                        self.start_extract(path);
                     }
                 }
 
@@ -369,6 +381,9 @@ impl eframe::App for AeGuiApp {
                             self.show_password_dialog = false;
                             self.password_error = None;
                             self.pending_path = None;
+                            if let Some(tx) = &self.cmd_tx {
+                                let _ = tx.send(WorkerCommand::Cancel);
+                            }
                             self.status_text = "已取消解压".to_string();
                         }
                     });

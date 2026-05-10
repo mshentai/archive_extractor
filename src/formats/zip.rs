@@ -35,10 +35,14 @@ pub(crate) fn extract_zip<R: Read + Seek>(
             archive.by_index(i)
         };
 
-        // 如果无密码但条目加密，返回密码所需错误
-        if let Err(ref e) = entry_result {
+        // 如果条目因加密/密码错误失败，返回相应错误
+        if let Err(e) = &entry_result {
             if is_password_required_error(e) {
-                return Err(ExtractError::PasswordRequired);
+                return if password.is_some() {
+                    Err(ExtractError::WrongPassword)
+                } else {
+                    Err(ExtractError::PasswordRequired)
+                };
             }
         }
 
@@ -76,13 +80,17 @@ pub(crate) fn extract_zip<R: Read + Seek>(
     Ok(())
 }
 
-/// 检查是否为「需要密码」的 ZIP 错误
+/// 检查是否为「需要密码」或「密码错误」的 ZIP 错误
+///
+/// zip crate v2.4.2 使用两种不同的错误变体表示密码问题：
+/// - `UnsupportedArchive(PASSWORD_REQUIRED)` — 未提供密码
+/// - `InvalidPassword` — 密码错误，或 AES 加密文件未提供密码
 pub fn is_password_required_error(e: &zip::result::ZipError) -> bool {
     matches!(
         e,
         zip::result::ZipError::UnsupportedArchive(msg)
             if *msg == zip::result::ZipError::PASSWORD_REQUIRED
-    )
+    ) || matches!(e, zip::result::ZipError::InvalidPassword)
 }
 
 /// 将 ZIP 条目写入磁盘

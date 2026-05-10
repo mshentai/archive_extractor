@@ -25,9 +25,13 @@ pub(crate) fn extract_7z(
         }
         Err(e) => {
             let err_msg = e.to_string();
-            // 判断是否需要密码：sevenz-rust 在加密且无密码时会返回特定错误信息
-            if password.is_none() && is_7z_password_error(&err_msg) {
-                Err(ExtractError::PasswordRequired)
+            // 判断是否为密码相关错误
+            if is_7z_password_error(&err_msg) {
+                if password.is_some() {
+                    Err(ExtractError::WrongPassword)
+                } else {
+                    Err(ExtractError::PasswordRequired)
+                }
             } else {
                 Err(ExtractError::ExtractFailed(format!(
                     "解压 7z 文件失败: {}",

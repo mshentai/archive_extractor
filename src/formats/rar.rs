@@ -36,8 +36,8 @@ pub(crate) fn extract_rar(
             }
             Err(e) => {
                 let err_msg = e.to_string();
-                // 无密码且遇到加密相关错误
-                if password.is_none() && is_rar_password_error(&err_msg) {
+                // 密码相关错误（无密码 或 密码错误）
+                if is_rar_password_error(&err_msg) {
                     // 检查是否有部分文件被解压
                     let extracted_count = e.data.as_ref().map_or(0, |v| v.len());
                     if extracted_count > 0 {
@@ -47,7 +47,11 @@ pub(crate) fn extract_rar(
                             extracted_count
                         );
                     }
-                    Err(ExtractError::PasswordRequired)
+                    if password.is_some() {
+                        Err(ExtractError::WrongPassword)
+                    } else {
+                        Err(ExtractError::PasswordRequired)
+                    }
                 } else {
                     Err(ExtractError::ExtractFailed(format!(
                         "解压 RAR 文件失败: {}",
@@ -58,8 +62,12 @@ pub(crate) fn extract_rar(
         },
         Err(e) => {
             let err_msg = e.to_string();
-            if password.is_none() && is_rar_password_error(&err_msg) {
-                Err(ExtractError::PasswordRequired)
+            if is_rar_password_error(&err_msg) {
+                if password.is_some() {
+                    Err(ExtractError::WrongPassword)
+                } else {
+                    Err(ExtractError::PasswordRequired)
+                }
             } else {
                 Err(ExtractError::ExtractFailed(format!(
                     "打开 RAR 文件失败: {}",

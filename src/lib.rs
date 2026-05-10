@@ -14,6 +14,8 @@ use std::path::Path;
 pub enum ExtractError {
     /// 压缩包需要密码，但未提供
     PasswordRequired,
+    /// 提供的密码错误
+    WrongPassword,
     /// 解压失败（IO 错误、格式错误等）
     ExtractFailed(String),
 }
@@ -22,6 +24,7 @@ impl fmt::Display for ExtractError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ExtractError::PasswordRequired => write!(f, "需要密码"),
+            ExtractError::WrongPassword => write!(f, "密码错误"),
             ExtractError::ExtractFailed(msg) => write!(f, "解压失败: {}", msg),
         }
     }
