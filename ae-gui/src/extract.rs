@@ -30,8 +30,11 @@ pub enum WorkerMessage {
 /// UI 线程 → 工作线程的命令
 #[derive(Debug)]
 pub enum WorkerCommand {
-    /// 启动批处理解压（不再传 password，改为交互式）
-    Extract { path: PathBuf },
+    /// 启动批处理解压
+    Extract {
+        path: PathBuf,
+        flat: bool,
+    },
     /// 用户提交的密码
     ProvidePassword(String),
     /// 用户取消当前批处理
@@ -49,6 +52,7 @@ struct ExtractState {
     current_password: Option<String>,
     msg_tx: mpsc::Sender<WorkerMessage>,
     has_error: bool,
+    flat: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -70,7 +74,7 @@ pub fn spawn_worker() -> (mpsc::Sender<WorkerCommand>, mpsc::Receiver<WorkerMess
             };
 
             match cmd {
-                WorkerCommand::Extract { path } => {
+                WorkerCommand::Extract { path, flat } => {
                     // 收集文件列表
                     let files = if path.is_file() {
                         vec![path]
@@ -95,6 +99,7 @@ pub fn spawn_worker() -> (mpsc::Sender<WorkerCommand>, mpsc::Receiver<WorkerMess
                         current_password: None,
                         msg_tx: msg_tx.clone(),
                         has_error: false,
+                        flat,
                     });
 
                     // 开始处理
@@ -144,7 +149,13 @@ fn process_current(state: &mut Option<ExtractState>) {
             file_path.display()
         )));
 
-        let result = archive_extractor::extract(file_path, s.current_password.as_deref());
+        // 根据 flat 模式选择解压方式
+        let result = if s.flat {
+            let dest = file_path.parent().unwrap_or(Path::new("."));
+            archive_extractor::extract_to(file_path, dest, s.current_password.as_deref())
+        } else {
+            archive_extractor::extract(file_path, s.current_password.as_deref())
+        };
 
         match &result {
             Ok(()) => {

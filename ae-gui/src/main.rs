@@ -10,17 +10,22 @@ use eframe::egui::{FontDefinitions, FontFamily, ViewportBuilder};
 fn main() -> Result<(), eframe::Error> {
     // 解析命令行参数
     let args: Vec<String> = std::env::args().collect();
-    let silent_file: Option<PathBuf> = if args.len() > 1 {
-        let path = PathBuf::from(&args[1]);
-        if path.exists() {
-            Some(path)
+    let mut silent_file: Option<PathBuf> = None;
+    let mut flat = false;
+
+    // 跳过第一个参数（程序路径），解析剩余参数
+    for arg in args.iter().skip(1) {
+        if arg == "--flat" || arg == "-f" {
+            flat = true;
         } else {
-            eprintln!("文件不存在: {}", args[1]);
-            None
+            let path = PathBuf::from(arg);
+            if path.exists() {
+                silent_file = Some(path);
+            } else {
+                eprintln!("文件不存在: {}", arg);
+            }
         }
-    } else {
-        None
-    };
+    }
 
     // 静默模式下自动开始解压标记
     let auto_start = silent_file.is_some();
@@ -79,7 +84,7 @@ fn main() -> Result<(), eframe::Error> {
             cc.egui_ctx.set_fonts(fonts);
             // ================================================================
 
-            let mut gui_app = app::AeGuiApp::new(silent_file);
+            let mut gui_app = app::AeGuiApp::new(silent_file, flat);
             if auto_start {
                 gui_app.set_auto_start();
             }

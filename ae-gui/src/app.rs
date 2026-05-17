@@ -16,6 +16,9 @@ pub struct AeGuiApp {
     // --- 文件路径 ---
     file_path: Option<PathBuf>,
 
+    // --- 解压模式 ---
+    flat: bool,
+
     // --- 解压状态 ---
     is_extracting: bool,
     status_text: String,
@@ -37,6 +40,7 @@ pub struct AeGuiApp {
 
     // --- 右键菜单状态 ---
     context_menu_registered: bool,
+    context_menu_flat_registered: bool,
     context_menu_message: Option<String>,
 
     // --- 程序退出 ---
@@ -47,11 +51,13 @@ impl AeGuiApp {
     /// 创建新应用实例
     ///
     /// `silent_file` — 从右键菜单启动时传入的文件路径
-    pub fn new(silent_file: Option<PathBuf>) -> Self {
+    /// `flat` — 是否使用平铺模式解压
+    pub fn new(silent_file: Option<PathBuf>, flat: bool) -> Self {
         let (cmd_tx, msg_rx) = extract::spawn_worker();
 
         Self {
             file_path: silent_file.clone(),
+            flat,
             is_extracting: false,
             status_text: String::new(),
             log_messages: Vec::new(),
@@ -64,6 +70,7 @@ impl AeGuiApp {
             cmd_tx: Some(cmd_tx),
             msg_rx: Some(msg_rx),
             context_menu_registered: context_menu::is_registered(),
+            context_menu_flat_registered: context_menu::is_flat_registered(),
             context_menu_message: None,
             should_exit: false,
         }
@@ -77,12 +84,16 @@ impl AeGuiApp {
     /// 启动解压
     fn start_extract(&mut self, path: PathBuf) {
         self.is_extracting = true;
-        self.status_text = format!("正在解压: {} ...", path.display());
+        let mode = if self.flat { "平铺模式" } else { "标准模式" };
+        self.status_text = format!("{} 正在解压: {} ...", mode, path.display());
         self.log_messages.clear();
         self.password_error = None;
 
         if let Some(tx) = &self.cmd_tx {
-            let _ = tx.send(WorkerCommand::Extract { path });
+            let _ = tx.send(WorkerCommand::Extract {
+                path,
+                flat: self.flat,
+            });
         }
     }
 
@@ -183,12 +194,6 @@ impl eframe::App for AeGuiApp {
             }
         }
 
-        // --- 检查是否需要退出 ---
-        if self.should_exit {
-            // 卸载时清理注册表（由安装程序在卸载时调用，这里作为保障）
-            // 实际退出由 main.rs 中的计时器控制
-        }
-
         // =====================================================================
         // 主界面布局
         // =====================================================================
@@ -218,7 +223,14 @@ impl eframe::App for AeGuiApp {
 
             ui.add_space(4.0);
 
-            // 解压操作按钮
+            // =================================================================
+            // 解压模式切换 + 操作按钮
+            // =================================================================
+            ui.horizontal(|ui| {
+                // 平铺模式复选框
+                ui.checkbox(&mut self.flat, "📂 平铺模式（直接解压到当前目录）");
+            });
+
             ui.horizontal(|ui| {
                 let can_extract = self.file_path.is_some() && !self.is_extracting;
                 let extract_btn = Button::new(RichText::new("🚀 解压").size(16.0));
@@ -236,6 +248,14 @@ impl eframe::App for AeGuiApp {
                 // 状态文字
                 ui.label(&self.status_text);
             });
+
+            // 显示当前模式提示
+            if self.flat {
+                ui.colored_label(
+                    Color32::LIGHT_BLUE,
+                    "💡 平铺模式：压缩包内容将直接解压到当前目录，不创建子文件夹",
+                );
+            }
 
             ui.add_space(8.0);
             ui.separator();
@@ -272,10 +292,12 @@ impl eframe::App for AeGuiApp {
             // =================================================================
             ui.heading("⚙ 右键菜单管理");
 
+            // --- 普通模式 ---
             ui.horizontal(|ui| {
+                ui.label("标准模式: ");
                 let registered = self.context_menu_registered;
 
-                let register_btn = Button::new("📝 注册右键菜单");
+                let register_btn = Button::new("📝 注册");
                 if registered {
                     ui.add_enabled(false, register_btn);
                 } else {
@@ -284,26 +306,73 @@ impl eframe::App for AeGuiApp {
                         match context_menu::register(&exe_path) {
                             Ok(()) => {
                                 self.context_menu_registered = true;
-                                self.context_menu_message = Some("✅ 右键菜单注册成功".to_string());
+                                self.context_menu_message =
+                                    Some("✅ 标准模式右键菜单注册成功".to_string());
                             }
                             Err(e) => {
-                                self.context_menu_message = Some(format!("❌ 注册失败: {}", e));
+                                self.context_menu_message =
+                                    Some(format!("❌ 注册失败: {}", e));
                             }
                         }
                     }
                 }
 
-                let unregister_btn = Button::new("🗑 取消注册");
                 if registered {
+                    ui.colored_label(Color32::GREEN, "● 已注册");
+                } else {
+                    ui.colored_label(Color32::GRAY, "○ 未注册");
+                }
+            });
+
+            // --- 平铺模式 ---
+            ui.horizontal(|ui| {
+                ui.label("平铺模式: ");
+                let flat_registered = self.context_menu_flat_registered;
+
+                let register_btn = Button::new("📝 注册");
+                if flat_registered {
+                    ui.add_enabled(false, register_btn);
+                } else {
+                    if ui.add(register_btn).clicked() {
+                        let exe_path = std::env::current_exe().unwrap_or_default();
+                        match context_menu::register_flat(&exe_path) {
+                            Ok(()) => {
+                                self.context_menu_flat_registered = true;
+                                self.context_menu_message =
+                                    Some("✅ 平铺模式右键菜单注册成功".to_string());
+                            }
+                            Err(e) => {
+                                self.context_menu_message =
+                                    Some(format!("❌ 注册失败: {}", e));
+                            }
+                        }
+                    }
+                }
+
+                if flat_registered {
+                    ui.colored_label(Color32::GREEN, "● 已注册");
+                } else {
+                    ui.colored_label(Color32::GRAY, "○ 未注册");
+                }
+            });
+
+            // --- 取消注册 ---
+            ui.horizontal(|ui| {
+                let any_registered =
+                    self.context_menu_registered || self.context_menu_flat_registered;
+                let unregister_btn = Button::new("🗑 取消注册全部");
+                if any_registered {
                     if ui.add(unregister_btn).clicked() {
                         match context_menu::unregister() {
                             Ok(()) => {
                                 self.context_menu_registered = false;
+                                self.context_menu_flat_registered = false;
                                 self.context_menu_message =
-                                    Some("✅ 右键菜单已取消注册".to_string());
+                                    Some("✅ 所有右键菜单已取消注册".to_string());
                             }
                             Err(e) => {
-                                self.context_menu_message = Some(format!("❌ 取消注册失败: {}", e));
+                                self.context_menu_message =
+                                    Some(format!("❌ 取消注册失败: {}", e));
                             }
                         }
                     }
@@ -315,13 +384,6 @@ impl eframe::App for AeGuiApp {
             // 显示右键菜单状态消息
             if let Some(msg) = &self.context_menu_message {
                 ui.label(msg);
-            }
-
-            // 显示当前注册状态
-            if self.context_menu_registered {
-                ui.colored_label(Color32::GREEN, "● 右键菜单已注册");
-            } else {
-                ui.colored_label(Color32::GRAY, "○ 右键菜单未注册");
             }
         });
 
@@ -360,10 +422,6 @@ impl eframe::App for AeGuiApp {
                     // 自动聚焦
                     if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
                         self.submit_password();
-                    }
-                    // 初始聚焦
-                    if response.gained_focus() {
-                        // nothing
                     }
 
                     // 密码错误提示
