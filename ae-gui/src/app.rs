@@ -84,7 +84,11 @@ impl AeGuiApp {
     /// 启动解压
     fn start_extract(&mut self, path: PathBuf) {
         self.is_extracting = true;
-        let mode = if self.flat { "平铺模式" } else { "标准模式" };
+        let mode = if self.flat {
+            "平铺模式"
+        } else {
+            "标准模式"
+        };
         self.status_text = format!("{} 正在解压: {} ...", mode, path.display());
         self.log_messages.clear();
         self.password_error = None;
@@ -185,6 +189,12 @@ impl eframe::App for AeGuiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // --- 轮询工作线程消息 ---
         self.poll_worker();
+
+        // --- 静默模式下解压成功后自动关闭窗口 ---
+        if self.should_exit {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            return;
+        }
 
         // --- 静默模式下自动开始解压（仅在第一次 update 时） ---
         if self.should_start_extract {
@@ -310,8 +320,7 @@ impl eframe::App for AeGuiApp {
                                     Some("✅ 标准模式右键菜单注册成功".to_string());
                             }
                             Err(e) => {
-                                self.context_menu_message =
-                                    Some(format!("❌ 注册失败: {}", e));
+                                self.context_menu_message = Some(format!("❌ 注册失败: {}", e));
                             }
                         }
                     }
@@ -342,8 +351,7 @@ impl eframe::App for AeGuiApp {
                                     Some("✅ 平铺模式右键菜单注册成功".to_string());
                             }
                             Err(e) => {
-                                self.context_menu_message =
-                                    Some(format!("❌ 注册失败: {}", e));
+                                self.context_menu_message = Some(format!("❌ 注册失败: {}", e));
                             }
                         }
                     }
@@ -371,8 +379,7 @@ impl eframe::App for AeGuiApp {
                                     Some("✅ 所有右键菜单已取消注册".to_string());
                             }
                             Err(e) => {
-                                self.context_menu_message =
-                                    Some(format!("❌ 取消注册失败: {}", e));
+                                self.context_menu_message = Some(format!("❌ 取消注册失败: {}", e));
                             }
                         }
                     }
