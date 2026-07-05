@@ -420,6 +420,11 @@ impl eframe::App for AeGuiApp {
                     }
                     ui.add_space(8.0);
 
+                    // 在 TextEdit 之前拦截 Enter 键（TextEdit 会消费掉 Enter 事件）
+                    if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter)) {
+                        self.submit_password();
+                    }
+
                     // 密码输入框（明文）
                     let response = ui.add_sized(
                         [250.0, 20.0],
@@ -428,9 +433,6 @@ impl eframe::App for AeGuiApp {
                     );
                     // 自动聚焦到密码输入框
                     response.request_focus();
-                    if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                        self.submit_password();
-                    }
 
                     // 密码错误提示
                     if let Some(err) = &self.password_error {
@@ -443,7 +445,9 @@ impl eframe::App for AeGuiApp {
                         if ui.button("确定").clicked() {
                             self.submit_password();
                         }
-                        if ui.button("取消").clicked() {
+                        if ui.button("取消").clicked()
+                            || ui.input(|i| i.key_pressed(egui::Key::Escape))
+                        {
                             self.show_password_dialog = false;
                             self.password_error = None;
                             self.pending_path = None;
