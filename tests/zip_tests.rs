@@ -285,11 +285,11 @@ fn test_extract_zip_flat_with_subdirs() {
 }
 
 #[test]
-fn test_extract_zip_flat_conflict_overwrite() {
-    // flat 模式下，两个压缩包解压到同目录：后覆盖先
+fn test_extract_zip_flat_conflict_auto_rename() {
+    // flat 模式下，两个压缩包解压到同目录：同名文件自动重命名，不覆盖
     let dir = temp_dir("zip_flat_conflict");
 
-    // 第一个压缩包：version1.txt
+    // 第一个压缩包：data.txt
     let zip1 = create_test_zip(&[("data.txt", b"version1")], None);
     let zip1_path = write_temp_file(&dir, "a.zip", &zip1);
 
@@ -302,9 +302,19 @@ fn test_extract_zip_flat_conflict_overwrite() {
     let _ = extract_to(&zip1_path, &dest, None);
     assert_eq!(read_file_to_string(&dest.join("data.txt")), "version1");
 
-    // 再解压 b.zip（覆盖 a.zip 的 data.txt）
+    // 再解压 b.zip → data.txt 冲突，自动重命名为 data_1.txt
     let _ = extract_to(&zip2_path, &dest, None);
 
-    // 验证被覆盖为 version2
-    assert_eq!(read_file_to_string(&dest.join("data.txt")), "version2");
+    // data.txt 应保持为 version1（不被覆盖）
+    assert_eq!(
+        read_file_to_string(&dest.join("data.txt")),
+        "version1",
+        "原文件应保持不变"
+    );
+    // data_1.txt 应为 version2
+    assert_eq!(
+        read_file_to_string(&dest.join("data_1.txt")),
+        "version2",
+        "冲突文件应自动重命名为 data_1.txt"
+    );
 }

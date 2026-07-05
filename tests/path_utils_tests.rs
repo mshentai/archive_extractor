@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use archive_extractor::path_utils::default_dest;
+use archive_extractor::path_utils::{default_dest, resolve_conflict_path};
 
 #[test]
 fn test_default_dest_basic() {
@@ -93,4 +93,105 @@ fn test_default_dest_multi_extension() {
 fn test_default_dest_windows_path() {
     let p = Path::new("C:\\Downloads\\file.7z");
     assert_eq!(default_dest(p), Path::new("C:\\Downloads\\file"));
+}
+
+// ---------------------------------------------------------------------------
+// resolve_conflict_path 测试
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_resolve_conflict_path_no_conflict() {
+    // 不存在的路径应原样返回
+    let path = Path::new("C:\\nonexistent\\file.txt");
+    assert_eq!(resolve_conflict_path(path), path);
+}
+
+#[test]
+fn test_resolve_conflict_path_with_extension() {
+    let dir = std::env::temp_dir().join("ae_test_resolve_ext");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+
+    // 创建 file.txt
+    let path = dir.join("file.txt");
+    fs::write(&path, b"original").unwrap();
+
+    let resolved = resolve_conflict_path(&path);
+    assert_eq!(resolved, dir.join("file_1.txt"), "应自动添加 _1 后缀");
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_resolve_conflict_path_no_extension() {
+    let dir = std::env::temp_dir().join("ae_test_resolve_noext");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+
+    // 创建无扩展名文件 "README"
+    let path = dir.join("README");
+    fs::write(&path, b"content").unwrap();
+
+    let resolved = resolve_conflict_path(&path);
+    assert_eq!(resolved, dir.join("README_1"), "无扩展名应添加 _1 后缀");
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_resolve_conflict_path_multiple_conflicts() {
+    let dir = std::env::temp_dir().join("ae_test_resolve_multi");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+
+    // 创建 data.txt 和 data_1.txt
+    let path = dir.join("data.txt");
+    fs::write(&path, b"v0").unwrap();
+    fs::write(&dir.join("data_1.txt"), b"v1").unwrap();
+
+    let resolved = resolve_conflict_path(&path);
+    assert_eq!(
+        resolved,
+        dir.join("data_2.txt"),
+        "跳过 data_1.txt，使用 data_2.txt"
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_resolve_conflict_path_double_extension() {
+    let dir = std::env::temp_dir().join("ae_test_resolve_double_ext");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+
+    // 创建 archive.tar.gz
+    let path = dir.join("archive.tar.gz");
+    fs::write(&path, b"content").unwrap();
+
+    let resolved = resolve_conflict_path(&path);
+    // 后缀应加在最后一个扩展名之前：archive.tar_1.gz
+    assert_eq!(
+        resolved,
+        dir.join("archive.tar_1.gz"),
+        "双扩展名应在最后一个点前插入 _1"
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_resolve_conflict_path_dir_no_conflict() {
+    // 目录路径应原样返回
+    let dir = std::env::temp_dir().join("ae_test_resolve_dir");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+
+    let path = dir.join("subdir");
+    fs::create_dir_all(&path).unwrap();
+
+    let resolved = resolve_conflict_path(&path);
+    assert_eq!(resolved, path, "目录不应被重命名");
+
+    let _ = fs::remove_dir_all(&dir);
 }

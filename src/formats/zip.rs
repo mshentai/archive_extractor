@@ -3,7 +3,7 @@ use std::io::{Read, Seek};
 use std::path::Path;
 
 use crate::ExtractError;
-use crate::path_utils::ensure_parent_dir;
+use crate::path_utils::{ensure_parent_dir, resolve_conflict_path};
 
 /// 解压 ZIP 文件（流式读取，无需全量加载到内存）
 pub(crate) fn extract_zip<R: Read + Seek>(
@@ -94,15 +94,20 @@ pub fn is_password_required_error(e: &zip::result::ZipError) -> bool {
 }
 
 /// 将 ZIP 条目写入磁盘
-/// 如果目标文件已存在，打印警告
+///
+/// 如果目标文件已存在，自动为文件名添加 `_1`、`_2`……后缀避免覆盖。
+/// 重命名时会打印提示日志。
 pub(crate) fn write_entry<R: std::io::Read>(
     reader: &mut R,
     out_path: &Path,
 ) -> std::io::Result<()> {
-    if out_path.exists() {
-        eprintln!("  警告: 文件已存在，将被覆盖: {}", out_path.display());
+    let actual_path = resolve_conflict_path(out_path);
+
+    if actual_path != out_path {
+        eprintln!("  文件已存在，重命名为: {}", actual_path.display());
     }
-    let mut out_file = fs::File::create(out_path)?;
+
+    let mut out_file = fs::File::create(&actual_path)?;
     std::io::copy(reader, &mut out_file)?;
     Ok(())
 }
