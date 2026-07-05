@@ -82,7 +82,7 @@ impl AeGuiApp {
     }
 
     /// 启动解压
-    fn start_extract(&mut self, path: PathBuf) {
+    fn start_extract(&mut self, path: PathBuf, ctx: &egui::Context) {
         self.is_extracting = true;
         let mode = if self.flat {
             "平铺模式"
@@ -97,6 +97,7 @@ impl AeGuiApp {
             let _ = tx.send(WorkerCommand::Extract {
                 path,
                 flat: self.flat,
+                ctx: ctx.clone(),
             });
         }
     }
@@ -200,7 +201,7 @@ impl eframe::App for AeGuiApp {
         if self.should_start_extract {
             self.should_start_extract = false;
             if let Some(path) = self.silent_file.clone() {
-                self.start_extract(path);
+                self.start_extract(path, ctx);
             }
         }
 
@@ -251,7 +252,7 @@ impl eframe::App for AeGuiApp {
                 };
                 if response.clicked() {
                     if let Some(path) = self.file_path.clone() {
-                        self.start_extract(path);
+                        self.start_extract(path, ctx);
                     }
                 }
 
@@ -419,14 +420,14 @@ impl eframe::App for AeGuiApp {
                     }
                     ui.add_space(8.0);
 
-                    // 密码输入框
+                    // 密码输入框（明文）
                     let response = ui.add_sized(
                         [250.0, 20.0],
                         egui::TextEdit::singleline(&mut self.password_input)
-                            .password(true)
                             .hint_text("请输入密码"),
                     );
-                    // 自动聚焦
+                    // 自动聚焦到密码输入框
+                    response.request_focus();
                     if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
                         self.submit_password();
                     }

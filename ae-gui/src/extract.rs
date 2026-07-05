@@ -28,12 +28,13 @@ pub enum WorkerMessage {
 }
 
 /// UI 线程 → 工作线程的命令
-#[derive(Debug)]
 pub enum WorkerCommand {
     /// 启动批处理解压
     Extract {
         path: PathBuf,
         flat: bool,
+        /// 用于解压完成后唤醒主线程（窗口最小化时也能触发 update）
+        ctx: egui::Context,
     },
     /// 用户提交的密码
     ProvidePassword(String),
@@ -53,6 +54,8 @@ struct ExtractState {
     msg_tx: mpsc::Sender<WorkerMessage>,
     has_error: bool,
     flat: bool,
+    /// 解压完成后唤醒主线程
+    ctx: egui::Context,
 }
 
 // ---------------------------------------------------------------------------
@@ -74,7 +77,7 @@ pub fn spawn_worker() -> (mpsc::Sender<WorkerCommand>, mpsc::Receiver<WorkerMess
             };
 
             match cmd {
-                WorkerCommand::Extract { path, flat } => {
+                WorkerCommand::Extract { path, flat, ctx } => {
                     // 收集文件列表
                     let files = if path.is_file() {
                         vec![path]
@@ -90,6 +93,7 @@ pub fn spawn_worker() -> (mpsc::Sender<WorkerCommand>, mpsc::Receiver<WorkerMess
                         let _ =
                             msg_tx.send(WorkerMessage::Log("⚠ 没有找到可解压的文件".to_string()));
                         let _ = msg_tx.send(WorkerMessage::Finished(Ok(())));
+                        ctx.request_repaint(); // 唤醒主线程处理 Finished
                         continue;
                     }
 
@@ -100,6 +104,7 @@ pub fn spawn_worker() -> (mpsc::Sender<WorkerCommand>, mpsc::Receiver<WorkerMess
                         msg_tx: msg_tx.clone(),
                         has_error: false,
                         flat,
+                        ctx,
                     });
 
                     // 开始处理
@@ -207,6 +212,9 @@ fn process_current(state: &mut Option<ExtractState>) {
         Ok(())
     };
     let _ = s.msg_tx.send(WorkerMessage::Finished(final_result));
+
+    // 唤醒主线程，使其即使窗口最小化也能处理 Finished 消息
+    s.ctx.request_repaint();
 
     // 重置状态
     *state = None;
